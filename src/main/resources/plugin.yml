@@ -1,0 +1,56 @@
+name: CraftedEconomy
+version: '${project.version}'
+main: net.craftedsurvival.craftedeconomy.CraftedEconomy
+api-version: '1.21'
+author: SamsSide
+description: A production-ready economy plugin with Vault integration.
+
+depend:
+  - Vault
+
+softdepend:
+  - PlaceholderAPI
+
+commands:
+  balance:
+    description: Check your balance or another player's balance.
+    usage: /balance [player]
+    aliases: [bal, money]
+    permission: craftedeconomy.balance
+  pay:
+    description: Pay another player.
+    usage: /pay <player> <amount>
+    permission: craftedeconomy.pay
+  baltop:
+    description: View the balance leaderboard.
+    usage: /baltop [page]
+    permission: craftedeconomy.baltop
+  convert:
+    description: Convert between physical items and virtual currency.
+    usage: /convert <to|from> <amount>
+    permission: craftedeconomy.convert
+
+permissions:
+  craftedeconomy.balance:
+    description: Use /balance on yourself.
+    default: false
+  craftedeconomy.balance.others:
+    description: Use /balance on other players.
+    default: op
+  craftedeconomy.pay:
+    description: Use /pay to send money to others.
+    default: false
+  craftedeconomy.baltop:
+    description: Use /baltop to view the leaderboard.
+    default: false
+  craftedeconomy.convert:
+    description: Use /convert to exchange physical items and virtual currency.
+    default: false
+  craftedeconomy.admin:
+    description: Parent node for all admin permissions.
+    default: op
+    children:
+      craftedeconomy.admin.set: true
+  craftedeconomy.admin.set:
+    description: Reserved for future /eco set command.
+    default: op
