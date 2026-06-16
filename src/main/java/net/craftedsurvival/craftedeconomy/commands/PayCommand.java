@@ -1,19 +1,24 @@
 package net.craftedsurvival.craftedeconomy.commands;
 
 import net.craftedsurvival.craftedeconomy.CraftedEconomy;
+import net.craftedsurvival.craftedeconomy.database.TransactionType;
+import net.craftedsurvival.craftedeconomy.util.TabCompleteUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
-public class PayCommand implements CommandExecutor {
+public class PayCommand implements CommandExecutor, TabCompleter {
 
     private final CraftedEconomy plugin;
 
@@ -73,6 +78,16 @@ public class PayCommand implements CommandExecutor {
         return true;
     }
 
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
+                                      @NotNull String label, @NotNull String[] args) {
+        if (args.length == 1 && sender instanceof Player payer
+                && sender.hasPermission("craftedeconomy.pay")) {
+            return TabCompleteUtil.filter(TabCompleteUtil.onlinePlayerNamesExcept(payer), args[0]);
+        }
+        return Collections.emptyList();
+    }
+
     @SuppressWarnings("deprecation")
     private void resolveTarget(Player payer, String targetName, double amount) {
         Player online = Bukkit.getPlayerExact(targetName);
@@ -119,6 +134,8 @@ public class PayCommand implements CommandExecutor {
                                                 "player", payer.getName()
                                         )));
                                     }
+                                    logPayTransactions(payerUuid, targetUuid, amount,
+                                            payer.getName(), resolvedName);
                                 })
                                 .exceptionally(ex -> {
                                     // Credit to recipient failed — refund sender
@@ -141,5 +158,20 @@ public class PayCommand implements CommandExecutor {
             payer.sendMessage(plugin.getMessages().get("error-generic"));
             return null;
         });
+    }
+
+    /**
+     * Log both sides of a completed pay (sender + recipient) as two rows.
+     * The post-transfer balance is read back as the authoritative value and the
+     * pre-transfer balance is derived from the known delta. Best-effort only.
+     */
+    private void logPayTransactions(UUID payerUuid, UUID targetUuid, double amount,
+                                    String payerName, String recipientName) {
+        plugin.getDatabase().getBalance(payerUuid).thenAccept(after ->
+                plugin.getDatabase().logTransaction(payerUuid, TransactionType.PAY_SENT.name(),
+                        amount, after + amount, after, recipientName, null));
+        plugin.getDatabase().getBalance(targetUuid).thenAccept(after ->
+                plugin.getDatabase().logTransaction(targetUuid, TransactionType.PAY_RECEIVED.name(),
+                        amount, after - amount, after, payerName, null));
     }
 }

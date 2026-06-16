@@ -73,3 +73,17 @@ messages:
   no-permission: "&cYou don't have permission to do that."
   console-only-players: "&cOnly players can use this command."
   error-generic: "&cAn error occurred. Please try again."
+  # ── Admin economy (/admineconomy, /ae) ──────────────────────────────────────
+  admin-usage: "&7Usage: &f/admineconomy <add|subtract|set|logs> <player> [amount|page]"
+  admin-add-success: "&7Added &a{amount} {currency} &7to &e{player}&7's balance. New balance: &a{balance}&7."
+  admin-subtract-success: "&7Subtracted &a{amount} {currency} &7from &e{player}&7's balance. New balance: &a{balance}&7."
+  admin-subtract-clamped: "&eBalance would go negative — clamped to &a0&e. New balance: &a0 {currency}&e."
+  admin-set-success: "&7Set &e{player}&7's balance to &a{amount} {currency}&7."
+  admin-notify-player: "&7Your balance was updated by a server administrator. New balance: &a{balance} {currency}&7."
+  admin-invalid-amount: "&cPlease enter a valid positive number."
+  admin-player-not-found: "&cPlayer '{player}' has never joined this server."
+  # ── Transaction logs (/admineconomy logs) ───────────────────────────────────
+  logs-header: "&8&m-----&r &bTransaction Log &7— &e{player} &8&m-----"
+  logs-entry: "&8#{id} &7| &b{type} &7| &a{amount} {currency} &7| Bal: &a{balance_after} &7| &e{actor} &7| &f{timestamp}"
+  logs-empty: "&cNo transaction history found for &e{player}&c."
+  logs-footer: "&7Page &f{page}&7/&f{total_pages}"

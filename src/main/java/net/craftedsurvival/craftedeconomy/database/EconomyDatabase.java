@@ -23,6 +23,24 @@ public interface EconomyDatabase {
 
     CompletableFuture<Integer> getPlayerCount();
 
+    // ── Transaction logging ───────────────────────────────────────────────────
+
+    /**
+     * Insert a transaction log row. This call is best-effort: a failure is logged
+     * as SEVERE but never propagates, so a logging error can never roll back the
+     * economy operation that triggered it. The returned future always completes
+     * normally.
+     */
+    CompletableFuture<Void> logTransaction(UUID uuid, String type, double amount,
+                                           double balanceBefore, double balanceAfter,
+                                           String actor, String note);
+
+    /** Fetch a player's transaction history, most recent first. */
+    CompletableFuture<List<TransactionEntry>> getTransactions(UUID uuid, int page, int pageSize);
+
+    /** Count the total number of transactions logged for a player. */
+    CompletableFuture<Integer> getTransactionCount(UUID uuid);
+
     CompletableFuture<Boolean> playerExists(UUID playerUuid);
 
     CompletableFuture<Void> createAccount(UUID playerUuid, String playerName);

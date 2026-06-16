@@ -7,16 +7,23 @@ import org.bukkit.OfflinePlayer;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 
 public class EconomyExpansion extends PlaceholderExpansion {
 
+    private static final long TX_COUNT_CACHE_MILLIS = 60_000L;
+
     private final CraftedEconomy plugin;
+    private final ConcurrentHashMap<UUID, CachedCount> txCountCache = new ConcurrentHashMap<>();
 
     public EconomyExpansion(CraftedEconomy plugin) {
         this.plugin = plugin;
     }
+
+    private record CachedCount(int value, long expiresAt) {}
 
     @Override
     public @NotNull String getIdentifier() {
@@ -49,10 +56,34 @@ public class EconomyExpansion extends PlaceholderExpansion {
         if (params.equals("rank")) {
             return getRank(player);
         }
+        if (params.equals("transactions_count")) {
+            return getTransactionCount(player);
+        }
         if (params.startsWith("baltop_")) {
             return getBaltopPlaceholder(params);
         }
         return null;
+    }
+
+    private String getTransactionCount(OfflinePlayer player) {
+        if (player == null) return "0";
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+
+        CachedCount cached = txCountCache.get(uuid);
+        if (cached != null && cached.expiresAt() > now) {
+            return String.valueOf(cached.value());
+        }
+
+        try {
+            int count = plugin.getDatabase().getTransactionCount(uuid).get();
+            txCountCache.put(uuid, new CachedCount(count, now + TX_COUNT_CACHE_MILLIS));
+            return String.valueOf(count);
+        } catch (InterruptedException | ExecutionException e) {
+            plugin.getLogger().log(Level.WARNING,
+                    "PAPI transaction count lookup failed for " + player.getName(), e);
+            return cached != null ? String.valueOf(cached.value()) : "0";
+        }
     }
 
     private String getBalance(OfflinePlayer player, boolean formatted) {

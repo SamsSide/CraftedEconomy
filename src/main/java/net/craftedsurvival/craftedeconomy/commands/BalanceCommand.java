@@ -1,19 +1,23 @@
 package net.craftedsurvival.craftedeconomy.commands;
 
 import net.craftedsurvival.craftedeconomy.CraftedEconomy;
+import net.craftedsurvival.craftedeconomy.util.TabCompleteUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
-public class BalanceCommand implements CommandExecutor {
+public class BalanceCommand implements CommandExecutor, TabCompleter {
 
     private final CraftedEconomy plugin;
 
@@ -44,6 +48,15 @@ public class BalanceCommand implements CommandExecutor {
             lookupAndShow(sender, targetName);
         }
         return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
+                                      @NotNull String label, @NotNull String[] args) {
+        if (args.length == 1 && sender.hasPermission("craftedeconomy.balance.others")) {
+            return TabCompleteUtil.filter(TabCompleteUtil.onlinePlayerNames(), args[0]);
+        }
+        return Collections.emptyList();
     }
 
     private void showBalance(CommandSender sender, UUID uuid, String name) {

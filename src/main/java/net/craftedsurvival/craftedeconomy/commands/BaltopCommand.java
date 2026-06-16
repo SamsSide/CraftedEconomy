@@ -2,18 +2,23 @@ package net.craftedsurvival.craftedeconomy.commands;
 
 import net.craftedsurvival.craftedeconomy.CraftedEconomy;
 import net.craftedsurvival.craftedeconomy.database.BalanceEntry;
+import net.craftedsurvival.craftedeconomy.util.TabCompleteUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-public class BaltopCommand implements CommandExecutor {
+public class BaltopCommand implements CommandExecutor, TabCompleter {
+
+    private static final List<String> PAGE_HINTS = List.of("1", "2", "3");
 
     private final CraftedEconomy plugin;
 
@@ -67,6 +72,15 @@ public class BaltopCommand implements CommandExecutor {
         });
 
         return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
+                                      @NotNull String label, @NotNull String[] args) {
+        if (args.length == 1 && sender.hasPermission("craftedeconomy.baltop")) {
+            return TabCompleteUtil.filter(PAGE_HINTS, args[0]);
+        }
+        return Collections.emptyList();
     }
 
     private void renderPage(CommandSender sender, List<BalanceEntry> entries,

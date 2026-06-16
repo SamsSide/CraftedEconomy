@@ -10,6 +10,9 @@ import net.craftedsurvival.craftedeconomy.util.BalanceFormatter;
 import net.craftedsurvival.craftedeconomy.util.BaltopCache;
 import net.craftedsurvival.craftedeconomy.util.MessageManager;
 import net.milkbowl.vault.economy.Economy;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -95,10 +98,21 @@ public final class CraftedEconomy extends JavaPlugin {
     }
 
     private void registerCommands() {
-        Objects.requireNonNull(getCommand("balance")).setExecutor(new BalanceCommand(this));
-        Objects.requireNonNull(getCommand("pay")).setExecutor(new PayCommand(this));
-        Objects.requireNonNull(getCommand("baltop")).setExecutor(new BaltopCommand(this));
-        Objects.requireNonNull(getCommand("convert")).setExecutor(new ConvertCommand(this));
+        register("balance", new BalanceCommand(this));
+        register("pay", new PayCommand(this));
+        register("baltop", new BaltopCommand(this));
+        register("convert", new ConvertCommand(this));
+        register("admineconomy", new AdminEconomyCommand(this));
+    }
+
+    /** Register an executor and, if it also implements {@link TabCompleter}, its completer. */
+    private void register(String name, CommandExecutor executor) {
+        PluginCommand command = Objects.requireNonNull(getCommand(name),
+                "Command '" + name + "' is missing from plugin.yml");
+        command.setExecutor(executor);
+        if (executor instanceof TabCompleter tabCompleter) {
+            command.setTabCompleter(tabCompleter);
+        }
     }
 
     private void registerListeners() {

@@ -1,20 +1,26 @@
 package net.craftedsurvival.craftedeconomy.commands;
 
 import net.craftedsurvival.craftedeconomy.CraftedEconomy;
+import net.craftedsurvival.craftedeconomy.database.TransactionType;
+import net.craftedsurvival.craftedeconomy.util.TabCompleteUtil;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
-public class ConvertCommand implements CommandExecutor {
+public class ConvertCommand implements CommandExecutor, TabCompleter {
 
     private static final int STACK_SIZE = 64;
+    private static final List<String> DIRECTIONS = List.of("to", "from");
 
     private final CraftedEconomy plugin;
 
@@ -73,6 +79,15 @@ public class ConvertCommand implements CommandExecutor {
         return true;
     }
 
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
+                                      @NotNull String label, @NotNull String[] args) {
+        if (args.length == 1 && sender.hasPermission("craftedeconomy.convert")) {
+            return TabCompleteUtil.filter(DIRECTIONS, args[0]);
+        }
+        return Collections.emptyList();
+    }
+
     private void convertToVirtual(Player player, double amount, Material currencyItem,
                                    double exchangeRate, String currencyPlural, String itemName) {
         // amount must be a whole number of items
@@ -95,12 +110,19 @@ public class ConvertCommand implements CommandExecutor {
         // Remove items first, then credit
         removeItems(player, currencyItem, physicalCount);
         plugin.getDatabase().addBalance(player.getUniqueId(), virtualAmount)
-                .thenRun(() -> player.sendMessage(plugin.getMessages().get("convert-to-success", Map.of(
-                        "physical", String.valueOf(physicalCount),
-                        "item", itemName,
-                        "virtual", plugin.getBalanceFormatter().format(virtualAmount),
-                        "currency", currencyPlural
-                ))))
+                .thenRun(() -> {
+                    player.sendMessage(plugin.getMessages().get("convert-to-success", Map.of(
+                            "physical", String.valueOf(physicalCount),
+                            "item", itemName,
+                            "virtual", plugin.getBalanceFormatter().format(virtualAmount),
+                            "currency", currencyPlural
+                    )));
+                    plugin.getDatabase().getBalance(player.getUniqueId()).thenAccept(after ->
+                            plugin.getDatabase().logTransaction(player.getUniqueId(),
+                                    TransactionType.CONVERT_TO.name(), virtualAmount,
+                                    after - virtualAmount, after, "self",
+                                    physicalCount + " " + itemName + " -> virtual"));
+                })
                 .exceptionally(ex -> {
                     // Rollback: return items
                     plugin.getLogger().log(Level.SEVERE,
@@ -177,6 +199,14 @@ public class ConvertCommand implements CommandExecutor {
                                     "physical", String.valueOf(actualGiven),
                                     "item", itemName
                             )));
+                            // Log the net amount actually debited (after any mid-give refund).
+                            int givenFinal = actualGiven;
+                            double netCost = givenFinal * exchangeRate;
+                            plugin.getDatabase().getBalance(player.getUniqueId()).thenAccept(after ->
+                                    plugin.getDatabase().logTransaction(player.getUniqueId(),
+                                            TransactionType.CONVERT_FROM.name(), netCost,
+                                            after + netCost, after, "self",
+                                            "virtual -> " + givenFinal + " " + itemName));
                         });
                     })
                     .exceptionally(ex -> {

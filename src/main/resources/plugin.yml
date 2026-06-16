@@ -29,28 +29,45 @@ commands:
     description: Convert between physical items and virtual currency.
     usage: /convert <to|from> <amount>
     permission: craftedeconomy.convert
+  admineconomy:
+    description: Admin economy management commands.
+    usage: /<command> <add|subtract|set|logs> <player> [amount|page]
+    permission: craftedeconomy.admin
+    aliases: [ae]
 
 permissions:
   craftedeconomy.balance:
-    description: Use /balance on yourself.
-    default: false
+    description: Use /balance on self.
+    default: true
   craftedeconomy.balance.others:
-    description: Use /balance on other players.
+    description: Use /balance <player> on others.
     default: op
   craftedeconomy.pay:
-    description: Use /pay to send money to others.
-    default: false
+    description: Use /pay.
+    default: true
   craftedeconomy.baltop:
-    description: Use /baltop to view the leaderboard.
-    default: false
+    description: Use /baltop.
+    default: true
   craftedeconomy.convert:
-    description: Use /convert to exchange physical items and virtual currency.
-    default: false
+    description: Use /convert.
+    default: true
   craftedeconomy.admin:
-    description: Parent node for all admin permissions.
+    description: Parent node — grants all admin subcommands.
     default: op
     children:
+      craftedeconomy.admin.add: true
+      craftedeconomy.admin.subtract: true
       craftedeconomy.admin.set: true
+      craftedeconomy.admin.logs: true
+  craftedeconomy.admin.add:
+    description: Use /admineconomy add.
+    default: op
+  craftedeconomy.admin.subtract:
+    description: Use /admineconomy subtract.
+    default: op
   craftedeconomy.admin.set:
-    description: Reserved for future /eco set command.
+    description: Use /admineconomy set.
+    default: op
+  craftedeconomy.admin.logs:
+    description: Use /admineconomy logs.
     default: op

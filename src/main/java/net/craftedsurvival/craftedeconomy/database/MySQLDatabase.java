@@ -35,6 +35,7 @@ public class MySQLDatabase implements EconomyDatabase {
             String password = plugin.getConfig().getString("database.password", "password");
             int poolSize = plugin.getConfig().getInt("database.pool-size", 10);
 
+            config.setDriverClassName("net.craftedsurvival.craftedeconomy.libs.mariadb.Driver");
             config.setJdbcUrl("jdbc:mariadb://" + host + ":" + port + "/" + dbName
                     + "?useSSL=false&characterEncoding=UTF-8");
             config.setUsername(username);
@@ -51,6 +52,7 @@ public class MySQLDatabase implements EconomyDatabase {
 
             dataSource = new HikariDataSource(config);
             createTable();
+            createTransactionTable();
         });
     }
 
@@ -66,6 +68,33 @@ public class MySQLDatabase implements EconomyDatabase {
             stmt.executeUpdate(sql);
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to create balance table", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void createTransactionTable() {
+        // Indexes are declared inline so the statement is fully idempotent under
+        // CREATE TABLE IF NOT EXISTS on both MySQL and MariaDB (CREATE INDEX IF NOT
+        // EXISTS is not portable across both engines).
+        String sql = "CREATE TABLE IF NOT EXISTS " + tablePrefix + "transactions ("
+                + "id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, "
+                + "uuid VARCHAR(36) NOT NULL, "
+                + "type VARCHAR(32) NOT NULL, "
+                + "amount DECIMAL(18,4) NOT NULL, "
+                + "balance_before DECIMAL(18,4) NOT NULL, "
+                + "balance_after DECIMAL(18,4) NOT NULL, "
+                + "actor VARCHAR(64) DEFAULT NULL, "
+                + "note VARCHAR(255) DEFAULT NULL, "
+                + "timestamp BIGINT NOT NULL, "
+                + "INDEX idx_transactions_uuid (uuid), "
+                + "INDEX idx_transactions_uuid_ts (uuid, timestamp)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(sql);
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Failed to create transactions table", e);
             throw new RuntimeException(e);
         }
     }
@@ -290,6 +319,86 @@ public class MySQLDatabase implements EconomyDatabase {
                 ps.executeUpdate();
             } catch (SQLException e) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to create account for " + playerName, e);
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<Void> logTransaction(UUID playerUuid, String type, double amount,
+                                                  double balanceBefore, double balanceAfter,
+                                                  String actor, String note) {
+        return CompletableFuture.runAsync(() -> {
+            String sql = "INSERT INTO " + tablePrefix + "transactions "
+                    + "(uuid, type, amount, balance_before, balance_after, actor, note, timestamp) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, playerUuid.toString());
+                ps.setString(2, type);
+                ps.setDouble(3, amount);
+                ps.setDouble(4, balanceBefore);
+                ps.setDouble(5, balanceAfter);
+                if (actor != null) ps.setString(6, actor); else ps.setNull(6, Types.VARCHAR);
+                if (note != null) ps.setString(7, note); else ps.setNull(7, Types.VARCHAR);
+                ps.setLong(8, System.currentTimeMillis());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                // Best-effort: log but never propagate, so the economy operation is not rolled back.
+                plugin.getLogger().log(Level.SEVERE,
+                        "Failed to log transaction (" + type + ") for " + playerUuid, e);
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<TransactionEntry>> getTransactions(UUID playerUuid, int page, int pageSize) {
+        return CompletableFuture.supplyAsync(() -> {
+            int offset = (page - 1) * pageSize;
+            String sql = "SELECT id, uuid, type, amount, balance_before, balance_after, actor, note, timestamp "
+                    + "FROM " + tablePrefix + "transactions WHERE uuid = ? "
+                    + "ORDER BY timestamp DESC LIMIT ? OFFSET ?";
+            List<TransactionEntry> entries = new ArrayList<>();
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, playerUuid.toString());
+                ps.setInt(2, pageSize);
+                ps.setInt(3, offset);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        entries.add(new TransactionEntry(
+                                rs.getLong("id"),
+                                UUID.fromString(rs.getString("uuid")),
+                                rs.getString("type"),
+                                rs.getDouble("amount"),
+                                rs.getDouble("balance_before"),
+                                rs.getDouble("balance_after"),
+                                rs.getString("actor"),
+                                rs.getString("note"),
+                                rs.getLong("timestamp")
+                        ));
+                    }
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to fetch transactions for " + playerUuid, e);
+                throw new RuntimeException(e);
+            }
+            return entries;
+        });
+    }
+
+    @Override
+    public CompletableFuture<Integer> getTransactionCount(UUID playerUuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "SELECT COUNT(*) FROM " + tablePrefix + "transactions WHERE uuid = ?";
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, playerUuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getInt(1) : 0;
+                }
+            } catch (SQLException e) {
+                plugin.getLogger().log(Level.SEVERE, "Failed to count transactions for " + playerUuid, e);
                 throw new RuntimeException(e);
             }
         });
