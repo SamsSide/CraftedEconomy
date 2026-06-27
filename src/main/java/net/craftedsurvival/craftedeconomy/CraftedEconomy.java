@@ -30,7 +30,7 @@ public final class CraftedEconomy extends JavaPlugin {
 
     private EconomyDatabase database;
     private MessageManager messages;
-    private BalanceFormatter balanceFormatter;
+    private volatile BalanceFormatter balanceFormatter;
     private BaltopCache baltopCache;
     private CraftedEconomyAPI api;
 
@@ -172,6 +172,17 @@ public final class CraftedEconomy extends JavaPlugin {
 
     private void registerListeners() {
         getServer().getPluginManager().registerEvents(new PlayerJoinListener(this), this);
+    }
+
+    /**
+     * Hot-reloads {@code config.yml} from disk and refreshes all config-derived state
+     * that is safe to update at runtime. The database connection pool is not rebuilt —
+     * changes to {@code database.*} settings in config require a full server restart.
+     */
+    public void reloadPluginConfig() {
+        reloadConfig();
+        balanceFormatter = new BalanceFormatter(this);
+        getLogger().info("config.yml reloaded. Database connection settings require a full restart to take effect.");
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────

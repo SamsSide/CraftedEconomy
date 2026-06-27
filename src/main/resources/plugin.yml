@@ -31,7 +31,7 @@ commands:
     permission: craftedeconomy.convert
   admineconomy:
     description: Admin economy management commands.
-    usage: /<command> <add|subtract|set|logs> <player> [amount|page]
+    usage: /<command> <add|subtract|set|logs|reload> <player> [amount|page]
     permission: craftedeconomy.admin
     aliases: [ae]
 
@@ -59,6 +59,7 @@ permissions:
       craftedeconomy.admin.subtract: true
       craftedeconomy.admin.set: true
       craftedeconomy.admin.logs: true
+      craftedeconomy.admin.reload: true
   craftedeconomy.admin.add:
     description: Use /admineconomy add.
     default: op
@@ -70,4 +71,7 @@ permissions:
     default: op
   craftedeconomy.admin.logs:
     description: Use /admineconomy logs.
+    default: op
+  craftedeconomy.admin.reload:
+    description: Use /admineconomy reload.
     default: op

@@ -141,6 +141,7 @@ All messages support `&` colour codes and hex colours via `&#RRGGBB`. Placeholde
 | `/admineconomy subtract` | `/admineconomy subtract <player> <amount>` | `craftedeconomy.admin.subtract` | Subtract from a player's balance (clamps at 0) |
 | `/admineconomy set` | `/admineconomy set <player> <amount>` | `craftedeconomy.admin.set` | Set a player's balance exactly (≥ 0) |
 | `/admineconomy logs` | `/admineconomy logs <player> [page]` | `craftedeconomy.admin.logs` | View a player's transaction history |
+| `/admineconomy reload` | `/admineconomy reload` | `craftedeconomy.admin.reload` | Reload `config.yml` without restarting the server |
 
 Aliases: `/balance` → `bal`, `money`; `/admineconomy` → `ae`.
 
@@ -157,13 +158,14 @@ Aliases: `/balance` → `bal`, `money`; `/admineconomy` → `ae`.
 | `craftedeconomy.pay` | `true` | Use `/pay` |
 | `craftedeconomy.baltop` | `true` | Use `/baltop` |
 | `craftedeconomy.convert` | `op` | Use `/convert` (console-only; the console always bypasses this check) |
-| `craftedeconomy.admin` | `op` | Parent node — grants all four admin children below |
+| `craftedeconomy.admin` | `op` | Parent node — grants all five admin children below |
 | `craftedeconomy.admin.add` | `op` | Use `/admineconomy add` |
 | `craftedeconomy.admin.subtract` | `op` | Use `/admineconomy subtract` |
 | `craftedeconomy.admin.set` | `op` | Use `/admineconomy set` |
 | `craftedeconomy.admin.logs` | `op` | Use `/admineconomy logs` |
+| `craftedeconomy.admin.reload` | `op` | Use `/admineconomy reload` |
 
-`craftedeconomy.admin` implicitly grants `add`, `subtract`, `set`, and `logs` via its `children` map.
+`craftedeconomy.admin` implicitly grants `add`, `subtract`, `set`, `logs`, and `reload` via its `children` map.
 
 ---
 
@@ -175,7 +177,7 @@ Every command provides server-side, case-insensitive prefix-filtered tab complet
 - **`/pay`** — suggests online player names (excluding the sender) on arg 1.
 - **`/convert`** — suggests online player names on arg 1 and `to` / `from` on arg 2 (used from the console / command blocks; players cannot run the command).
 - **`/baltop`** — suggests `1` / `2` / `3` page hints on arg 1.
-- **`/admineconomy`** — arg 1 suggests `add` / `subtract` / `set` / `logs`, filtered to the subcommands the sender actually has permission for; arg 2 suggests online player names; arg 3 suggests page hints for `logs`.
+- **`/admineconomy`** — arg 1 suggests `add` / `subtract` / `set` / `logs` / `reload`, filtered to the subcommands the sender actually has permission for; arg 2 suggests online player names (not offered for `reload`, which takes no arguments); arg 3 suggests page hints for `logs`.
 
 ---
 

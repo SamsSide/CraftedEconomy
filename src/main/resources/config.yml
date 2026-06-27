@@ -78,7 +78,7 @@ messages:
   console-only-players: "&cOnly players can use this command."
   error-generic: "&cAn error occurred. Please try again."
   # ── Admin economy (/admineconomy, /ae) ──────────────────────────────────────
-  admin-usage: "&7Usage: &f/admineconomy <add|subtract|set|logs> <player> [amount|page]"
+  admin-usage: "&7Usage: &f/admineconomy <add|subtract|set|logs|reload> <player> [amount|page]"
   admin-add-success: "&7Added &a{amount} {currency} &7to &e{player}&7's balance. New balance: &a{balance}&7."
   admin-subtract-success: "&7Subtracted &a{amount} {currency} &7from &e{player}&7's balance. New balance: &a{balance}&7."
   admin-subtract-clamped: "&eBalance would go negative — clamped to &a0&e. New balance: &a0 {currency}&e."
@@ -91,3 +91,6 @@ messages:
   logs-entry: "&8#{id} &7| &b{type} &7| &a{amount} {currency} &7| Bal: &a{balance_after} &7| &e{actor} &7| &f{timestamp}"
   logs-empty: "&cNo transaction history found for &e{player}&c."
   logs-footer: "&7Page &f{page}&7/&f{total_pages}"
+  # ── Reload (/admineconomy reload) ───────────────────────────────────────────
+  admin-reload-success: "&aConfiguration reloaded successfully."
+  admin-reload-failed: "&cFailed to reload configuration. Check the console for details."

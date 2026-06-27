@@ -34,7 +34,7 @@ public class AdminEconomyCommand implements CommandExecutor, TabCompleter {
 
     private static final int LOGS_PAGE_SIZE = 10;
     private static final List<String> PAGE_HINTS = List.of("1", "2", "3");
-    private static final List<String> SUBCOMMANDS = List.of("add", "subtract", "set", "logs");
+    private static final List<String> SUBCOMMANDS = List.of("add", "subtract", "set", "logs", "reload");
 
     private final CraftedEconomy plugin;
 
@@ -55,6 +55,7 @@ public class AdminEconomyCommand implements CommandExecutor, TabCompleter {
             case "subtract" -> handleAmountChange(sender, args, TransactionType.ADMIN_SUBTRACT);
             case "set" -> handleAmountChange(sender, args, TransactionType.ADMIN_SET);
             case "logs" -> handleLogs(sender, args);
+            case "reload" -> handleReload(sender);
             default -> sender.sendMessage(plugin.getMessages().get("admin-usage"));
         }
         return true;
@@ -173,6 +174,22 @@ public class AdminEconomyCommand implements CommandExecutor, TabCompleter {
                     "balance", format(newBalance),
                     "currency", currency
             )));
+        }
+    }
+
+    // ── reload ────────────────────────────────────────────────────────────────
+
+    private void handleReload(CommandSender sender) {
+        if (!sender.hasPermission("craftedeconomy.admin.reload")) {
+            sender.sendMessage(plugin.getMessages().get("no-permission"));
+            return;
+        }
+        try {
+            plugin.reloadPluginConfig();
+            sender.sendMessage(plugin.getMessages().get("admin-reload-success"));
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.SEVERE, "Failed to reload config.yml", e);
+            sender.sendMessage(plugin.getMessages().get("admin-reload-failed"));
         }
     }
 
@@ -316,6 +333,7 @@ public class AdminEconomyCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && SUBCOMMANDS.contains(args[0].toLowerCase())
+                && !args[0].equalsIgnoreCase("reload")
                 && sender.hasPermission(permissionForSub(args[0].toLowerCase()))) {
             return TabCompleteUtil.filter(TabCompleteUtil.onlinePlayerNames(), args[1]);
         }
@@ -357,6 +375,7 @@ public class AdminEconomyCommand implements CommandExecutor, TabCompleter {
             case "subtract" -> "craftedeconomy.admin.subtract";
             case "set" -> "craftedeconomy.admin.set";
             case "logs" -> "craftedeconomy.admin.logs";
+            case "reload" -> "craftedeconomy.admin.reload";
             default -> "craftedeconomy.admin";
         };
     }
