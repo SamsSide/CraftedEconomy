@@ -17,10 +17,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
+/**
+ * Console-only conversion command driven by the banker NPC GUI.
+ *
+ * <p>Syntax: {@code /convert <player> <to|from> <amount>}. The GUI runs this as a
+ * console command, passing the name of the player who clicked. Real players are
+ * never allowed to invoke it directly, so there is no way to self-convert.</p>
+ */
 public class ConvertCommand implements CommandExecutor, TabCompleter {
 
     private static final int STACK_SIZE = 64;
     private static final List<String> DIRECTIONS = List.of("to", "from");
+    /** Actor recorded in the transaction log for console-driven conversions. */
+    private static final String ACTOR = "console";
 
     private final CraftedEconomy plugin;
 
@@ -31,37 +40,40 @@ public class ConvertCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
                              @NotNull String label, @NotNull String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(plugin.getMessages().get("console-only-players"));
+        // Console-only: a real player must never be able to run this themselves.
+        if (sender instanceof Player) {
+            sender.sendMessage(plugin.getMessages().get("convert-console-only"));
             return true;
         }
 
-        if (!player.hasPermission("craftedeconomy.convert")) {
-            player.sendMessage(plugin.getMessages().get("no-permission"));
+        if (args.length < 3) {
+            sender.sendMessage(plugin.getMessages().get("convert-usage"));
             return true;
         }
 
-        if (args.length < 2) {
-            player.sendMessage(plugin.getMessages().get("convert-invalid-direction"));
+        Player target = plugin.getServer().getPlayerExact(args[0]);
+        if (target == null || !target.isOnline()) {
+            sender.sendMessage(plugin.getMessages().get("convert-player-offline",
+                    Map.of("player", args[0])));
             return true;
         }
 
-        String direction = args[0].toLowerCase();
+        String direction = args[1].toLowerCase();
         if (!direction.equals("to") && !direction.equals("from")) {
-            player.sendMessage(plugin.getMessages().get("convert-invalid-direction"));
+            sender.sendMessage(plugin.getMessages().get("convert-invalid-direction"));
             return true;
         }
 
         double amount;
         try {
-            amount = Double.parseDouble(args[1]);
+            amount = Double.parseDouble(args[2]);
         } catch (NumberFormatException e) {
-            player.sendMessage(plugin.getMessages().get("convert-invalid-amount"));
+            sender.sendMessage(plugin.getMessages().get("convert-invalid-amount"));
             return true;
         }
 
         if (amount <= 0) {
-            player.sendMessage(plugin.getMessages().get("convert-invalid-amount"));
+            sender.sendMessage(plugin.getMessages().get("convert-invalid-amount"));
             return true;
         }
 
@@ -71,9 +83,9 @@ public class ConvertCommand implements CommandExecutor, TabCompleter {
         String itemName = currencyItem.name();
 
         if (direction.equals("to")) {
-            convertToVirtual(player, amount, currencyItem, exchangeRate, currencyPlural, itemName);
+            convertToVirtual(sender, target, amount, currencyItem, exchangeRate, currencyPlural, itemName);
         } else {
-            convertFromVirtual(player, amount, currencyItem, exchangeRate, currencyPlural, itemName);
+            convertFromVirtual(sender, target, amount, currencyItem, exchangeRate, currencyPlural, itemName);
         }
 
         return true;
@@ -82,17 +94,20 @@ public class ConvertCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String label, @NotNull String[] args) {
-        if (args.length == 1 && sender.hasPermission("craftedeconomy.convert")) {
-            return TabCompleteUtil.filter(DIRECTIONS, args[0]);
+        if (args.length == 1) {
+            return TabCompleteUtil.filter(TabCompleteUtil.onlinePlayerNames(), args[0]);
+        }
+        if (args.length == 2) {
+            return TabCompleteUtil.filter(DIRECTIONS, args[1]);
         }
         return Collections.emptyList();
     }
 
-    private void convertToVirtual(Player player, double amount, Material currencyItem,
+    private void convertToVirtual(CommandSender sender, Player player, double amount, Material currencyItem,
                                    double exchangeRate, String currencyPlural, String itemName) {
         // amount must be a whole number of items
         if (amount != Math.floor(amount)) {
-            player.sendMessage(plugin.getMessages().get("convert-invalid-amount"));
+            sender.sendMessage(plugin.getMessages().get("convert-invalid-amount"));
             return;
         }
 
@@ -120,7 +135,7 @@ public class ConvertCommand implements CommandExecutor, TabCompleter {
                     plugin.getDatabase().getBalance(player.getUniqueId()).thenAccept(after ->
                             plugin.getDatabase().logTransaction(player.getUniqueId(),
                                     TransactionType.CONVERT_TO.name(), virtualAmount,
-                                    after - virtualAmount, after, "self",
+                                    after - virtualAmount, after, ACTOR,
                                     physicalCount + " " + itemName + " -> virtual"));
                 })
                 .exceptionally(ex -> {
@@ -136,7 +151,7 @@ public class ConvertCommand implements CommandExecutor, TabCompleter {
                 });
     }
 
-    private void convertFromVirtual(Player player, double amount, Material currencyItem,
+    private void convertFromVirtual(CommandSender sender, Player player, double amount, Material currencyItem,
                                      double exchangeRate, String currencyPlural, String itemName) {
         int physicalCount = (int) Math.floor(amount / exchangeRate);
 
@@ -205,7 +220,7 @@ public class ConvertCommand implements CommandExecutor, TabCompleter {
                             plugin.getDatabase().getBalance(player.getUniqueId()).thenAccept(after ->
                                     plugin.getDatabase().logTransaction(player.getUniqueId(),
                                             TransactionType.CONVERT_FROM.name(), netCost,
-                                            after + netCost, after, "self",
+                                            after + netCost, after, ACTOR,
                                             "virtual -> " + givenFinal + " " + itemName));
                         });
                     })

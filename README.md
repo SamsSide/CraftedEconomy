@@ -45,6 +45,8 @@ HikariCP and the MariaDB connector are shaded and relocated inside the jar — n
 
 All options live in `config.yml`.
 
+**Automatic config updates** — on every startup CraftedEconomy performs a non-destructive merge of the bundled default config into your on-disk `config.yml`. Any new key shipped by an update (at any nesting depth, e.g. a new `messages:` entry) is added automatically, while **every value you have already set is preserved untouched** and nothing you added is ever removed. The merged file is saved back to disk and reloaded in the same startup, so new features never fail with missing-key errors and you never have to regenerate your config by hand. Database credentials, currency settings, the exchange rate, and your customised message strings all survive updates intact. (Comments for newly added sections are best-effort; correctness of values is guaranteed.)
+
 ### `database`
 
 | Key | Type | Default | Description |
@@ -100,6 +102,9 @@ All messages support `&` colour codes and hex colours via `&#RRGGBB`. Placeholde
 | `convert-amount-too-small` | — |
 | `convert-invalid-amount` | — |
 | `convert-invalid-direction` | — |
+| `convert-console-only` | — |
+| `convert-usage` | — |
+| `convert-player-offline` | `{player}` |
 | `baltop-header` | `{page}`, `{total_pages}` |
 | `baltop-entry` | `{rank}`, `{player}`, `{balance}`, `{currency}` |
 | `baltop-footer` | — |
@@ -131,7 +136,7 @@ All messages support `&` colour codes and hex colours via `&#RRGGBB`. Placeholde
 | `/balance` | `/balance [player]` | `craftedeconomy.balance` | Show your balance, or another player's |
 | `/pay` | `/pay <player> <amount>` | `craftedeconomy.pay` | Send currency to another player |
 | `/baltop` | `/baltop [page]` | `craftedeconomy.baltop` | View the paginated balance leaderboard |
-| `/convert` | `/convert <to\|from> <amount>` | `craftedeconomy.convert` | Exchange physical items ⇄ virtual currency |
+| `/convert` | `/convert <player> <to\|from> <amount>` | `craftedeconomy.convert` | **Console-only.** Exchange physical items ⇄ virtual currency for the named player (driven by the banker NPC GUI) |
 | `/admineconomy add` | `/admineconomy add <player> <amount>` | `craftedeconomy.admin.add` | Add to a player's balance |
 | `/admineconomy subtract` | `/admineconomy subtract <player> <amount>` | `craftedeconomy.admin.subtract` | Subtract from a player's balance (clamps at 0) |
 | `/admineconomy set` | `/admineconomy set <player> <amount>` | `craftedeconomy.admin.set` | Set a player's balance exactly (≥ 0) |
@@ -151,7 +156,7 @@ Aliases: `/balance` → `bal`, `money`; `/admineconomy` → `ae`.
 | `craftedeconomy.balance.others` | `op` | Use `/balance <player>` on others |
 | `craftedeconomy.pay` | `true` | Use `/pay` |
 | `craftedeconomy.baltop` | `true` | Use `/baltop` |
-| `craftedeconomy.convert` | `true` | Use `/convert` |
+| `craftedeconomy.convert` | `op` | Use `/convert` (console-only; the console always bypasses this check) |
 | `craftedeconomy.admin` | `op` | Parent node — grants all four admin children below |
 | `craftedeconomy.admin.add` | `op` | Use `/admineconomy add` |
 | `craftedeconomy.admin.subtract` | `op` | Use `/admineconomy subtract` |
@@ -168,7 +173,7 @@ Every command provides server-side, case-insensitive prefix-filtered tab complet
 
 - **`/balance`** — suggests online player names on arg 1, but only for senders with `craftedeconomy.balance.others`.
 - **`/pay`** — suggests online player names (excluding the sender) on arg 1.
-- **`/convert`** — suggests `to` / `from` on arg 1.
+- **`/convert`** — suggests online player names on arg 1 and `to` / `from` on arg 2 (used from the console / command blocks; players cannot run the command).
 - **`/baltop`** — suggests `1` / `2` / `3` page hints on arg 1.
 - **`/admineconomy`** — arg 1 suggests `add` / `subtract` / `set` / `logs`, filtered to the subcommands the sender actually has permission for; arg 2 suggests online player names; arg 3 suggests page hints for `logs`.
 
@@ -180,14 +185,26 @@ Registered automatically when PlaceholderAPI is present. Identifier: `craftedeco
 
 | Placeholder | Returns | Notes |
 |---|---|---|
-| `%craftedeconomy_balance%` | Player's formatted balance | Live DB lookup |
+| `%craftedeconomy_balance%` | Player's formatted balance | Live DB lookup, trimmed decimals |
 | `%craftedeconomy_balance_raw%` | Player's raw balance as a double | Live DB lookup |
 | `%craftedeconomy_rank%` | Player's position on the baltop | From cache |
 | `%craftedeconomy_baltop_1_name%` … `_10_name%` | Names of #1–#10 | From cache |
-| `%craftedeconomy_baltop_1_balance%` … `_10_balance%` | Balances of #1–#10 | From cache |
+| `%craftedeconomy_baltop_1_balance%` … `_10_balance%` | Balances of #1–#10 | From cache, trimmed decimals |
 | `%craftedeconomy_transactions_count%` | Total transactions for the player | Cached for 60 seconds |
 
 Baltop placeholders use a result cache that refreshes every `baltop.cache-refresh-seconds` (default 60) to avoid hammering the database on busy scoreboards. The transaction count is cached per player for 60 seconds.
+
+**Decimal trimming** — every balance-displaying placeholder (own balance, baltop balances, and any other) renders through a single shared formatter that rounds half-up to a maximum of **2** decimal places, then strips trailing zeros and a bare trailing decimal point. Integer-side thousands grouping is preserved. This only affects the rendered placeholder string — stored balances, `balance_raw`, the internal API, and all calculations are unchanged.
+
+| Stored value | Placeholder output |
+|---|---|
+| `10.00` | `10` |
+| `10.20` | `10.2` |
+| `10.21` | `10.21` |
+| `10` | `10` |
+| `10.215` | `10.22` |
+| `0.50` | `0.5` |
+| `0.00` | `0` |
 
 ---
 
@@ -206,7 +223,7 @@ Every balance change is recorded in the `ce_transactions` table so you have a fu
 | `/admineconomy subtract` | `ADMIN_SUBTRACT` |
 | `/admineconomy set` | `ADMIN_SET` |
 
-Each row stores the amount involved (always positive), the balance before and after, the actor (the other player's name for pays, the admin's name for admin actions, or `self` for conversions), an optional note, and a millisecond timestamp.
+Each row stores the amount involved (always positive), the balance before and after, the actor (the other player's name for pays, the admin's name for admin actions, or `console` for the banker-driven conversions), an optional note, and a millisecond timestamp. Conversions always attribute the **target player** (the one who clicked the banker GUI) as the affected account.
 
 **Resilience** — all log inserts are asynchronous. A logging failure is reported as a `SEVERE` warning in the console but never rolls back or blocks the economy operation that triggered it.
 
@@ -243,17 +260,26 @@ All API methods return `CompletableFuture` — never block the main thread waiti
 
 ## 10. Exchange / Conversion System
 
-The `/convert` command swaps physical items for virtual currency and back.
+The `/convert` command swaps physical items for virtual currency and back. It is **console-only** and intended to be driven by a banker NPC's GUI: clicking a button in the GUI fires the console command, passing the name of the player who clicked. **Players cannot run `/convert` themselves** — a real player who tries is rejected with the `convert-console-only` message — so there is no way to self-convert by typing a command. The GUI/NPC itself is not part of this plugin.
 
-**Physical → Virtual (`/convert to <amount>`)**
+```
+/convert <player> <to|from> <amount>
+```
+
+- `<player>` — the exact name of the **online** player to operate on. If they are offline or unknown, the console sender gets `convert-player-offline` and nothing changes.
+- `<to>` — physical → virtual.
+- `<from>` — virtual → physical.
+- `<amount>` — a positive number, validated as before.
+
+**Physical → Virtual (`/convert <player> to <amount>`)**
 
 1. `amount` must be a whole number of items.
-2. Matching items are counted across the player's inventory.
+2. Matching items are counted across the target player's inventory.
 3. If there are enough, the items are removed first.
 4. The virtual amount (`physical × exchange-rate`) is then credited.
 5. If the credit step fails, the items are returned automatically.
 
-**Virtual → Physical (`/convert from <amount>`)**
+**Virtual → Physical (`/convert <player> from <amount>`)**
 
 1. The number of physical items is `floor(amount / exchange-rate)`.
 2. If the result is 0, the player is told the amount is too small.
@@ -261,7 +287,7 @@ The `/convert` command swaps physical items for virtual currency and back.
 4. The exact virtual cost (`physical-count × exchange-rate`) is deducted first.
 5. Items are placed in the inventory on the main thread; if the inventory fills mid-give, the undelivered portion is refunded.
 
-The exchange rate is configurable via `currency.exchange-rate` (e.g. `2.0` makes one diamond worth two virtual diamonds).
+The same anti-duplication sequencing as before is preserved, and every conversion is still logged against the target player. The exchange rate is configurable via `currency.exchange-rate` (e.g. `2.0` makes one diamond worth two virtual diamonds).
 
 ---
 
@@ -305,7 +331,7 @@ CREATE TABLE IF NOT EXISTS ce_transactions (
 | `amount` | Amount involved (always positive) |
 | `balance_before` | Balance immediately before |
 | `balance_after` | Balance immediately after |
-| `actor` | Other player / admin name, or `self` (nullable) |
+| `actor` | Other player / admin name, or `console` for conversions (nullable) |
 | `note` | Optional free-text note (nullable) |
 | `timestamp` | Unix epoch milliseconds |
 

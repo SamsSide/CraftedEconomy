@@ -90,7 +90,7 @@ public class EconomyExpansion extends PlaceholderExpansion {
         if (player == null) return "0";
         try {
             double balance = plugin.getDatabase().getBalance(player.getUniqueId()).get();
-            return formatted ? plugin.getBalanceFormatter().format(balance) : String.valueOf(balance);
+            return formatted ? plugin.getBalanceFormatter().formatPlaceholder(balance) : String.valueOf(balance);
         } catch (InterruptedException | ExecutionException e) {
             plugin.getLogger().log(Level.WARNING, "PAPI balance lookup failed for " + player.getName(), e);
             return "0";
@@ -127,7 +127,7 @@ public class EconomyExpansion extends PlaceholderExpansion {
 
         return switch (parts[2]) {
             case "name" -> entry.playerName();
-            case "balance" -> plugin.getBalanceFormatter().format(entry.balance());
+            case "balance" -> plugin.getBalanceFormatter().formatPlaceholder(entry.balance());
             default -> null;
         };
     }

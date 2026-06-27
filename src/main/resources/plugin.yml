@@ -26,8 +26,8 @@ commands:
     usage: /baltop [page]
     permission: craftedeconomy.baltop
   convert:
-    description: Convert between physical items and virtual currency.
-    usage: /convert <to|from> <amount>
+    description: Console-only conversion between physical items and virtual currency (driven by the banker NPC GUI).
+    usage: /convert <player> <to|from> <amount>
     permission: craftedeconomy.convert
   admineconomy:
     description: Admin economy management commands.
@@ -49,8 +49,8 @@ permissions:
     description: Use /baltop.
     default: true
   craftedeconomy.convert:
-    description: Use /convert.
-    default: true
+    description: Use /convert (console-only; the console always bypasses this check).
+    default: op
   craftedeconomy.admin:
     description: Parent node — grants all admin subcommands.
     default: op

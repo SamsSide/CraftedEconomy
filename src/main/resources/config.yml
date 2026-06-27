@@ -61,7 +61,11 @@ messages:
   convert-inventory-full: "&cYour inventory doesn't have enough space to receive the items."
   convert-amount-too-small: "&cThat amount is too small to convert into any physical items."
   convert-invalid-amount: "&cPlease enter a valid positive amount."
-  convert-invalid-direction: "&cUsage: /convert <to|from> <amount>"
+  convert-invalid-direction: "&cInvalid direction. Use &fto &c(items → currency) or &ffrom &c(currency → items)."
+  # /convert is console-only (driven by the banker NPC GUI). These cover console-side validation.
+  convert-console-only: "&cThis command can only be run from the console."
+  convert-usage: "&cUsage: /convert <player> <to|from> <amount>"
+  convert-player-offline: "&cPlayer '{player}' is not online."
   baltop-header: "&8&m-----&r &bBalance Top &8— &7Page {page}/{total_pages} &8&m-----"
   baltop-entry: "&7#{rank}. &e{player} &8— &a{balance} {currency}"
   baltop-footer: "&8&m----------------------------------------"
